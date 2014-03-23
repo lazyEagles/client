@@ -18,16 +18,12 @@ int main(int argc, char **argv)
 	}
 
 	struct sockaddr_in sin;
-	char ipaddr[MAX_LINE];
-	char *ipptr = argv[1];
+	char *ipptr = argv[1]; /* ip without port */
 	int sd;
 	int buf[MAX_LINE];
 	FILE *fd;
 	int n;
 	char *cptr;
-	char eofchar = (char) EOF;
-	const char *eofptr = &eofchar;
-	const char *download = "102062999.jpg";
 	unsigned int file_size = 0;
 
 	bzero((char *) &sin, sizeof(sin));
@@ -49,7 +45,20 @@ int main(int argc, char **argv)
 
 	recv(sd, buf, sizeof(buf), 0);
 	fprintf(stdout, "%s\n", (char *)buf);
-	fgets((char *)buf, MAX_LINE, stdin);
+	/* get file name */
+	const char *prefix = "\"GET:";
+	const char *bufptr = (char *)buf;
+	char postfix[MAX_LINE];
+	strncpy(postfix, bufptr+6, 15);
+	const char *postptr = postfix;
+	strncpy((char *)buf, prefix, 6);
+	strncat((char *)buf, postptr, 15);
+//	fgets((char *)buf, MAX_LINE, stdin);
+	fprintf(stdout, "%s\n", (char *)buf);
+	char filename[MAX_LINE];
+	strncpy((char *)filename, postptr, 13);
+	filename[13] = '\0';
+	const char *download = filename;	
 	send(sd, buf, MAX_LINE, 0); // should send GET:xxx.jpg
 	const char *clinfo = "\"CLOSE:\"";
 	fd = fopen(download, "w");
@@ -57,12 +66,13 @@ int main(int argc, char **argv)
 	while ((m = recv(sd, buf, sizeof(buf), 0)) > 0) {
 		printf("%d\n", m);
 		usleep(1000);
+		/* if read "CLOSE:" */
 		if (strncmp((char *)buf, clinfo, 8) == 0) {
 			fprintf(stdout, "%s\n", (char *)buf);
 			break;
 		}
 		int i;
-		for (i = 0; i < MAX_LINE ; i++) {
+		for (i = 0; i < MAX_LINE && buf[i] != EOF ; i++) {
 			fputc(buf[i], fd);
 			file_size++;
 			//printf("%d:%x ", i, buf[i]);
